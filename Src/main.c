@@ -143,10 +143,10 @@ int main(void)
   pHeader.DLC = 1;
   pHeader.IDE = CAN_ID_STD;
   pHeader.RTR = CAN_RTR_DATA;
-  pHeader.StdId = 0x240;
+  pHeader.StdId = 0x3E;
 
   sFilterConfig.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-  sFilterConfig.FilterIdHigh = 0xF<<5;
+  sFilterConfig.FilterIdHigh = 0x1F<<5;
   sFilterConfig.FilterIdLow = 0;
   sFilterConfig.FilterMaskIdHigh = 0;
   sFilterConfig.FilterMaskIdLow = 0;
@@ -165,7 +165,7 @@ int main(void)
   HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
   HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
   target_speed_r = r_speed;
-  if (target_speed_r >= 0.05) {
+  if (target_speed_r >= 0.1) {
 	  input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
 	  rotate_time = (float)(input_capture*520)/1000000;
 	  rotate_speed = (1/rotate_time);
@@ -191,7 +191,8 @@ int main(void)
   else {
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-	  TIM2->CCR1 = 0;
+	  rotate_speed_can = 0;
+	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, &rotate_speed_can, &TxMailbox);
   }
   }
 
@@ -200,7 +201,7 @@ int main(void)
   HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
   target_speed_l = l_speed;
-  if (target_speed_l >= 0.05) {
+  if (target_speed_l >= 0.1) {
 	  input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
 	  rotate_time = (float)(input_capture*520)/1000000;
 	  rotate_speed = (1/rotate_time);
@@ -212,8 +213,8 @@ int main(void)
 	  pwm = TIM2->CCR4;
 
 	  if ((rotate_speed<(target_speed_l*0.999f))&&(rotate_speed!=0)) {
-		  if (TIM2->CCR4 > 999) {
-			  TIM2->CCR4 = 999;
+		  if (TIM2->CCR4 > 750) {
+			  TIM2->CCR4 = 750;
 	  	  }
 	  	  TIM2->CCR4 += 1;
 	  	  HAL_Delay(2);
@@ -226,7 +227,8 @@ int main(void)
   else {
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-	  TIM2->CCR1 = 0;
+	  rotate_speed_can = 0;
+	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, &rotate_speed_can, &TxMailbox);
   }
   }
 
@@ -234,7 +236,8 @@ int main(void)
   {
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-	  TIM2->CCR1 = 0;
+	  rotate_speed_can = 0;
+	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, &rotate_speed_can, &TxMailbox);
   }
 
 //  void stop_movement();
@@ -251,18 +254,42 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  //move_right(1.0);
+//	  if (t_speed < 0) {
+//		  move_right(-t_speed);
+//	  }
+//	  else if (t_speed > 0) {
+//		  move_left(t_speed);
+//	  }
+//	  //move_left(1.0);
+//	  else {
+//		  stop_movement();
+//	  }
 	  if (t_speed < 0) {
-		  move_right(-t_speed);
+		  move_left(-t_speed);
 	  }
 	  else if (t_speed > 0) {
-		  move_left(t_speed);
+		  move_right(t_speed);
 	  }
+	  	  //move_left(1.0);
 	  else {
-		  stop_movement();
+	  	 stop_movement();
 	  }
+//	  	  if (side_change == 1) {
+//	  		  move_right(1.0);
+//	  	  }
+//	  	  else if (side_change == 0) {
+//	  		  move_left(1.0);
+//	  	  }
+//	  	  else {
+//	  		  stop_movement();
+//	  	  }
+
+	  //HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_SET);
+	  //HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
+	  //TIM2->CCR4 = 400;
 
 
-	  //move_right(t_speed);
+	  //move_left(1.0);
   }
   /* USER CODE END 3 */
 }

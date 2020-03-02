@@ -215,7 +215,7 @@ void SysTick_Handler(void)
 void USB_LP_CAN1_RX0_IRQHandler(void)
 {
   /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 0 */
-
+  HAL_CAN_AddTxMessage(&hcan1, &pHeader, &rotate_speed_can, &TxMailbox);
   /* USER CODE END USB_LP_CAN1_RX0_IRQn 0 */
   HAL_CAN_IRQHandler(&hcan1);
   /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 1 */
@@ -229,6 +229,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
   else if (side == 1) {
 	  t_speed = control_data[1]/60.0f;
   }
+  //HAL_CAN_AddTxMessage(&hcan1, &pHeader, &rotate_speed_can, &TxMailbox);
 
 //
 //  t_speed += 0.1;
@@ -236,8 +237,11 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
 //  target_speed -= 0.05;
 //  if (target_speed < 0) {target_speed = 0;}
 //  if (target_speed > 1.5) {target_speed = 1.5;}
-  //HAL_CAN_AddTxMessage(&hcan1, &pHeader, &rotate_speed_can, &TxMailbox);
+//  	if (rotate_speed_can < 10) {
+//  		rotate_speed_can = 0;
+//  	}
 
+//  rotate_speed_can--;
 //  GPIOB->ODR = r << 12;
 //  GPIOB->ODR = r << 14;
 
