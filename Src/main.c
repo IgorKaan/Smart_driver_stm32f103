@@ -355,11 +355,9 @@ int main(void)
 	  else {
 	  	  stop_movement();
 	  }
-	  if ((HAL_GetTick() % 20) == 0) {
-		  driver_tx_data[0] = rotate_speed_can;
-		  driver_tx_data[1] = rotate_speed_side;
-	  }
-	  pred_t_speed = t_speed;
+	  driver_tx_data[0] = rotate_speed_can;
+	  driver_tx_data[1] = rotate_speed_side;
+
   }
   /* USER CODE END 3 */
 }
