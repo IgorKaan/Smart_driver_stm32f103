@@ -62,6 +62,7 @@ extern TIM_HandleTypeDef htim3;
 extern CAN_TxHeaderTypeDef pHeader;
 extern CAN_RxHeaderTypeDef pRxHeader;
 extern uint32_t TxMailbox;
+extern uint8_t driver_tx_data;
 extern uint8_t rotate_speed_can;
 extern uint8_t a;
 extern uint8_t f;
@@ -194,7 +195,9 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-
+  if (HAL_GetTick() % 20 == 0) {
+	HAL_CAN_AddTxMessage(&hcan1, &pHeader, &driver_tx_data, &TxMailbox);
+  }
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
@@ -219,7 +222,7 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
   /* USER CODE END USB_LP_CAN1_RX0_IRQn 0 */
   HAL_CAN_IRQHandler(&hcan1);
   /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 1 */
-  HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &pRxHeader, &control_data);
+  HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &pRxHeader, control_data);
 
   side = control_data[0];
   //t_speed = control_data[1]/60.0f;
