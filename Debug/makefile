@@ -24,16 +24,16 @@ endif
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-SMART\ DRIVER\ INTERNAL\ CLOCK.elf \
+stm32-f103-smart-driver.elf \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-SMART\ DRIVER\ INTERNAL\ CLOCK.list \
+stm32-f103-smart-driver.list \
 
 OBJCOPY_BIN += \
-SMART\ DRIVER\ INTERNAL\ CLOCK.bin \
+stm32-f103-smart-driver.bin \
 
 
 # All Target
@@ -41,11 +41,11 @@ all:
 	+@make --no-print-directory main-build && make --no-print-directory post-build
 
 # Main-build Target
-main-build: SMART\ DRIVER\ INTERNAL\ CLOCK.elf secondary-outputs
+main-build: stm32-f103-smart-driver.elf secondary-outputs
 
 # Tool invocations
-SMART\ DRIVER\ INTERNAL\ CLOCK.elf: $(OBJS) $(USER_OBJS) ../STM32F103C8_FLASH.ld
-	arm-none-eabi-gcc -o "SMART DRIVER INTERNAL CLOCK.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"../STM32F103C8_FLASH.ld" --specs=nosys.specs -Wl,-Map="SMART DRIVER INTERNAL CLOCK.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+stm32-f103-smart-driver.elf: $(OBJS) $(USER_OBJS) ../STM32F103C8_FLASH.ld
+	arm-none-eabi-gcc -o "stm32-f103-smart-driver.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"../STM32F103C8_FLASH.ld" --specs=nosys.specs -Wl,-Map="stm32-f103-smart-driver.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -54,13 +54,13 @@ default.size.stdout: $(EXECUTABLES)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-SMART\ DRIVER\ INTERNAL\ CLOCK.list: $(EXECUTABLES)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "SMART DRIVER INTERNAL CLOCK.list"
+stm32-f103-smart-driver.list: $(EXECUTABLES)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "stm32-f103-smart-driver.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-SMART\ DRIVER\ INTERNAL\ CLOCK.bin: $(EXECUTABLES)
-	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "SMART DRIVER INTERNAL CLOCK.bin"
+stm32-f103-smart-driver.bin: $(EXECUTABLES)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "stm32-f103-smart-driver.bin"
 	@echo 'Finished building: $@'
 	@echo ' '
 
@@ -70,7 +70,7 @@ clean:
 	-@echo ' '
 
 post-build:
-	arm-none-eabi-objcopy -O ihex "SMART DRIVER INTERNAL CLOCK.elf" "SMART DRIVER INTERNAL CLOCK.hex"
+	arm-none-eabi-objcopy -O ihex "stm32-f103-smart-driver.elf" "stm32-f103-smart-driver.hex"
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_BIN)
