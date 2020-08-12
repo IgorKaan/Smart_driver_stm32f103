@@ -332,13 +332,11 @@ int main(void)
 		  flag = State_Right;
 	  }
 	  else if ((t_speed < 0)&&(flag == State_Right)) {
-		  //move_left(-t_speed);
 		  while (rotate_speed >= 0.1) {
 			  reduce_speed_right();
 		  }
 		  stop_movement();
 		  flag = State_Left;
-		  //move_left(-t_speed);
 	  }
 	  else if ((t_speed < 0)&&(flag == State_Left)) {
 		  move_left(-t_speed);
