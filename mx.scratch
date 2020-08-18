@@ -9,9 +9,9 @@
     <HAL_Driver>/home/igor/STM32Cube/Repository//STM32Cube_FW_F1_V1.8.0</HAL_Driver>
     <CMSIS>Drivers/CMSIS</CMSIS>
     <Toolchain>STM32CubeIDE</Toolchain>
-    <IocFile>SMART DRIVER INTERNAL CLOCK.ioc</IocFile>
+    <IocFile>stm32-f103-smart-driver.ioc</IocFile>
     <Project>
-      <ProjectName>SMART DRIVER INTERNAL CLOCK</ProjectName>
+      <ProjectName>stm32-f103-smart-driver</ProjectName>
       <ProjectNature>C</ProjectNature>
       <Secure/>
       <filestoremove/>
@@ -20,17 +20,17 @@
       </sourceEntriesToRemove>
       <configs>
         <config>
-          <name>SMART DRIVER INTERNAL CLOCK</name>
+          <name>stm32-f103-smart-driver</name>
           <mainSourceRepo>Src</mainSourceRepo>
           <sourceStructure>Basic</sourceStructure>
           <device>STM32F103C8Tx</device>
           <cpucore>Arm Cortex-M3</cpucore>
-          <fpu>none</fpu>
+          <fpu>None</fpu>
           <memories>
             <memory access="xrw" name="RAM" size="20" start="0x20000000"/>
             <memory access="rx" name="FLASH" size="64" start="0x8000000"/>
           </memories>
-          <startup>/home/igor/STM32Cube/Repository//STM32Cube_FW_F1_V1.8.0/Drivers/CMSIS/Device\ST\STM32F1xx\Source\Templates\gcc\startup_stm32f103xb.s</startup>
+          <startup>/home/igor/STM32Cube/Repository/STM32Cube_FW_F1_V1.8.0/Drivers/CMSIS/Device\ST\STM32F1xx\Source\Templates\gcc\startup_stm32f103xb.s</startup>
           <LinkSettings>
             <LinkAdditionalLibs/>
           </LinkSettings>

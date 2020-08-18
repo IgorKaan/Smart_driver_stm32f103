@@ -62,7 +62,10 @@ extern TIM_HandleTypeDef htim3;
 extern CAN_TxHeaderTypeDef pHeader;
 extern CAN_RxHeaderTypeDef pRxHeader;
 extern uint32_t TxMailbox;
+extern uint8_t driver_tx_data[3];
 extern uint8_t rotate_speed_can;
+extern uint8_t rotate_speed_side;
+extern uint8_t state_can;
 extern uint8_t a;
 extern uint8_t f;
 extern uint8_t control_data[8];
@@ -74,7 +77,7 @@ extern _Bool side_change;
 /* USER CODE END EV */
 
 /******************************************************************************/
-/*           Cortex-M3 Processor Interruption and Exception Handlers          */ 
+/*           Cortex-M3 Processor Interruption and Exception Handlers          */
 /******************************************************************************/
 /**
   * @brief This function handles Non maskable interrupt.
@@ -194,7 +197,13 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
-
+//	  if ((HAL_GetTick() % 20) == 0) {
+//
+//		  driver_tx_data[0] = rotate_speed_can;
+//		  driver_tx_data[1] = rotate_speed_side;
+//		  //driver_tx_data[2] = state_can;
+//		  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
+//	  }
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
