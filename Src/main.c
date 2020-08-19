@@ -62,8 +62,8 @@ float t_speed = 0.0;
 float pred_t_speed = 1.0;
 
 uint32_t ratio = 555;
-uint32_t header_id = 0x3A;
-uint32_t filter_id = 0x3F;
+uint32_t header_id = 0xA;
+uint32_t filter_id = 0xF;
 uint32_t input_capture = 0;
 
 enum States
@@ -102,6 +102,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM3) {
 		TIM3->CNT = 0;
+		input_capture = 0;
 	}
 }
 /* USER CODE END 0 */
@@ -171,7 +172,12 @@ int main(void)
   if (target_speed_r >= 0.1) {
 	  input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
 	  rotate_time = (float)(input_capture*ratio)/1000000;
-	  rotate_speed = (1/rotate_time);
+	  if (rotate_time != 0) {
+		  rotate_speed = (1/rotate_time);
+	  }
+	  else {
+		  rotate_speed = 0;
+	  }
 	  rotate_speed_can = (uint8_t)(rotate_speed*60);
 	  if (rotate_time == 0) {
 		  rotate_speed = 0;
@@ -185,7 +191,7 @@ int main(void)
 	  	  driver_tx_data[1] = rotate_speed_side;
 		  driver_tx_data[2] = state;
 	  	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  	  HAL_Delay(3);
+	  	  HAL_Delay(2);
 	  }
 	  else if ((rotate_speed>(target_speed_r*1.001))) {
 		  if (TIM2->CCR4 > 0) {
@@ -195,7 +201,7 @@ int main(void)
 	  	  driver_tx_data[1] = rotate_speed_side;
 		  driver_tx_data[2] = state;
 	  	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  	  HAL_Delay(3);
+	  	  HAL_Delay(2);
 	  }
   }
   }
@@ -208,7 +214,12 @@ int main(void)
   if (target_speed_l >= 0.1) {
 	  input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
 	  rotate_time = (float)(input_capture*ratio)/1000000;
-	  rotate_speed = (1/rotate_time);
+	  if (rotate_time != 0) {
+		  rotate_speed = (1/rotate_time);
+	  }
+	  else {
+		  rotate_speed = 0;
+	  }
 	  rotate_speed_can = (uint8_t)(rotate_speed*60);
 	  if (rotate_time == 0) {
 		  rotate_speed = 0;
@@ -222,7 +233,7 @@ int main(void)
 	  	  driver_tx_data[1] = rotate_speed_side;
 		  driver_tx_data[2] = state;
 	  	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  	  HAL_Delay(3);
+	  	  HAL_Delay(2);
 	  }
 	  else if ((rotate_speed>(target_speed_l*1.001f))) {
 		  if (TIM2->CCR4 > 0) {
@@ -232,7 +243,7 @@ int main(void)
 		  driver_tx_data[1] = rotate_speed_side;
 		  driver_tx_data[2] = state;
 		  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  	  HAL_Delay(3);
+	  	  HAL_Delay(2);
 	  }
   }
   }
@@ -242,7 +253,12 @@ int main(void)
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
 	  	input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
 	  	rotate_time = (float)(input_capture*ratio)/1000000;
-	  	rotate_speed = (1/rotate_time);
+		if (rotate_time != 0) {
+			rotate_speed = (1/rotate_time);
+		}
+		else {
+			rotate_speed = 0;
+		}
 	  	rotate_speed_can = (uint8_t)(rotate_speed*60);
 	  	if (rotate_time == 0) {
 	  		rotate_speed = 0;
@@ -254,7 +270,7 @@ int main(void)
 	  		driver_tx_data[1] = rotate_speed_side;
 			driver_tx_data[2] = state;
 	  		HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  		HAL_Delay(3);
+	  		HAL_Delay(2);
   }
 
   void reduce_speed_left() {
@@ -262,7 +278,12 @@ int main(void)
   	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
   	  	input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
   	  	rotate_time = (float)(input_capture*ratio)/1000000;
-  	  	rotate_speed = (1/rotate_time);
+		if (rotate_time != 0) {
+			rotate_speed = (1/rotate_time);
+		}
+		else {
+			rotate_speed = 0;
+		}
   	  	rotate_speed_can = (uint8_t)(rotate_speed*60);
   	  	if (rotate_time == 0) {
   	  		rotate_speed = 0;
@@ -274,7 +295,7 @@ int main(void)
   	  		driver_tx_data[1] = rotate_speed_side;
   	  		driver_tx_data[2] = state;
   	  		HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-  	  		HAL_Delay(3);
+  	  		HAL_Delay(2);
   }
 
 //  void reduce_speed_right() {
