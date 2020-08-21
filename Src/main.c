@@ -17,7 +17,6 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
@@ -44,27 +43,40 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+CAN_HandleTypeDef hcan;
+
 TIM_HandleTypeDef htim2;
-TIM_HandleTypeDef htim3;
 
 /* USER CODE BEGIN PV */
-CAN_HandleTypeDef hcan1;
 CAN_TxHeaderTypeDef pHeader;
 CAN_RxHeaderTypeDef pRxHeader;
 CAN_FilterTypeDef sFilterConfig;
 uint32_t TxMailbox;
 
 uint8_t flag = 2;
-uint8_t state = 0;
 uint8_t control_data[8] = {0};
 uint8_t side;
-float t_speed = 0.0;
-float pred_t_speed = 1.0;
+uint8_t t_speed = 0;
+
+volatile uint8_t tick;
+volatile uint16_t hall_tick;
+volatile uint8_t hall_speed;
 
 uint32_t ratio = 555;
-uint32_t header_id = 0xA;
-uint32_t filter_id = 0xF;
+uint32_t header_id = 0x3A;
+uint32_t filter_id = 0x3F;
 uint32_t input_capture = 0;
+
+double difference = 0;
+double value = 0;
+double inc = 0;
+double kp = 0.0001;
+double kd;
+double ki;
+
+double u_pwm = 0;
+uint16_t pwm = 0;
+//uint16_t output = 0;
 
 enum States
 {
@@ -76,21 +88,18 @@ enum States
 
 uint8_t rotate_speed_can = 0;
 uint8_t rotate_speed_side = 0;
-uint8_t driver_tx_data[3] = {0};
+uint8_t driver_tx_data[4] = {0};
 
-float rotate_time = 0.0;
-float rotate_speed = 0.0;
-float target_speed_r = 0.0;
-float target_speed_l = 0.0;
-float target_speed_r_reduce = 0.0;
-float target_speed_l_reduce= 0.0;
+uint8_t target_speed_r = 0.0;
+uint8_t target_speed_l = 0.0;
+uint8_t target_speed_r_reduce = 0.0;
+uint8_t target_speed_l_reduce= 0.0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_CAN_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -98,13 +107,16 @@ static void MX_CAN_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
-{
-	if (htim->Instance == TIM3) {
-		TIM3->CNT = 0;
-		input_capture = 0;
-	}
-}
+//void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+//{
+//	if (htim->Instance == TIM3) {
+//		TIM3->CNT = 0;
+//		input_capture = 0;
+//	}
+//}
+//void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+//
+//}
 /* USER CODE END 0 */
 
 /**
@@ -136,14 +148,13 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_TIM2_Init();
-  MX_TIM3_Init();
   MX_CAN_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_4);
+  //HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_4);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_4);
   HAL_GPIO_WritePin(GPIOA,GPIO_PIN_2,GPIO_PIN_SET);
 
-  pHeader.DLC = 3;
+  pHeader.DLC = 4;
   pHeader.IDE = CAN_ID_STD;
   pHeader.RTR = CAN_RTR_DATA;
   pHeader.StdId = header_id;
@@ -156,10 +167,10 @@ int main(void)
   sFilterConfig.FilterScale = CAN_FILTERSCALE_16BIT;
   sFilterConfig.FilterMode = CAN_FILTERMODE_IDLIST;
   sFilterConfig.FilterActivation = ENABLE;
-  HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig);
+  HAL_CAN_ConfigFilter(&hcan, &sFilterConfig);
 
-  HAL_CAN_Start(&hcan1);
-  HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+  HAL_CAN_Start(&hcan);
+  HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
   HAL_Delay(50);
 
   TIM2->CCR4 = 220;
@@ -169,39 +180,25 @@ int main(void)
   HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
   target_speed_r = r_speed;
   rotate_speed_side = 1;
-  if (target_speed_r >= 0.1) {
-	  input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
-	  rotate_time = (float)(input_capture*ratio)/1000000;
-	  if (rotate_time != 0) {
-		  rotate_speed = (1/rotate_time);
+  if (target_speed_r > 0) {
+	  if (hall_speed < target_speed_r) {
+		  difference = (double)(target_speed_r - hall_speed);
+		  inc = difference * kp;
+		  value += inc;
+	  	  TIM2->CCR4 += (uint16_t)value;
+//	  	  driver_tx_data[0] = rotate_speed_can;
+//	  	  driver_tx_data[1] = rotate_speed_side;
+//	  	  HAL_CAN_AddTxMessage(&hcan, &pHeader, driver_tx_data, &TxMailbox);
+	  	  HAL_Delay(1);
 	  }
-	  else {
-		  rotate_speed = 0;
-	  }
-	  rotate_speed_can = (uint8_t)(rotate_speed*60);
-	  if (rotate_time == 0) {
-		  rotate_speed = 0;
-	  }
-	  if ((rotate_speed<(target_speed_r*0.999))&&(rotate_speed!=0)) {
-		  if (TIM2->CCR4 > 750) {
-			  TIM2->CCR4 = 750;
-	  	  }
-	  	  TIM2->CCR4 += 1;
-	  	  driver_tx_data[0] = rotate_speed_can;
-	  	  driver_tx_data[1] = rotate_speed_side;
-		  driver_tx_data[2] = state;
-	  	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  	  HAL_Delay(2);
-	  }
-	  else if ((rotate_speed>(target_speed_r*1.001))) {
+	  else if (hall_speed > target_speed_r) {
 		  if (TIM2->CCR4 > 0) {
 			  TIM2->CCR4 -= 1;
 		  }
-	  	  driver_tx_data[0] = rotate_speed_can;
-	  	  driver_tx_data[1] = rotate_speed_side;
-		  driver_tx_data[2] = state;
-	  	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  	  HAL_Delay(2);
+//	  	  driver_tx_data[0] = rotate_speed_can;
+//	  	  driver_tx_data[1] = rotate_speed_side;
+//	  	  HAL_CAN_AddTxMessage(&hcan, &pHeader, driver_tx_data, &TxMailbox);
+	  	  HAL_Delay(1);
 	  }
   }
   }
@@ -209,185 +206,59 @@ int main(void)
   void move_left(float l_speed) {
   HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-  target_speed_l = l_speed;
-  rotate_speed_side = 2;
-  if (target_speed_l >= 0.1) {
-	  input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
-	  rotate_time = (float)(input_capture*ratio)/1000000;
-	  if (rotate_time != 0) {
-		  rotate_speed = (1/rotate_time);
-	  }
-	  else {
-		  rotate_speed = 0;
-	  }
-	  rotate_speed_can = (uint8_t)(rotate_speed*60);
-	  if (rotate_time == 0) {
-		  rotate_speed = 0;
-	  }
-	  if ((rotate_speed<(target_speed_l*0.999f))&&(rotate_speed!=0)) {
-		  if (TIM2->CCR4 > 750) {
-			  TIM2->CCR4 = 750;
-	  	  }
-	  	  TIM2->CCR4 += 1;
-	  	  driver_tx_data[0] = rotate_speed_can;
-	  	  driver_tx_data[1] = rotate_speed_side;
-		  driver_tx_data[2] = state;
-	  	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  	  HAL_Delay(2);
-	  }
-	  else if ((rotate_speed>(target_speed_l*1.001f))) {
-		  if (TIM2->CCR4 > 0) {
-			  TIM2->CCR4 -= 1;
-		  }
-		  driver_tx_data[0] = rotate_speed_can;
-		  driver_tx_data[1] = rotate_speed_side;
-		  driver_tx_data[2] = state;
-		  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  	  HAL_Delay(2);
-	  }
+  TIM2->CCR4 = (uint16_t)pwm;
+//  target_speed_l = l_speed;
+//  rotate_speed_side = 2;
+//  if (target_speed_l > 0) {
+//	  if (hall_speed < target_speed_l) {
+//	  	  TIM2->CCR4 += 1;
+////	  	  driver_tx_data[0] = rotate_speed_can;
+////	  	  driver_tx_data[1] = rotate_speed_side;
+////	  	  HAL_CAN_AddTxMessage(&hcan, &pHeader, driver_tx_data, &TxMailbox);
+//	  	  HAL_Delay(3);
+//	  }
+//	  else if (hall_speed > target_speed_l) {
+//		  if (TIM2->CCR4 > 0) {
+//			  TIM2->CCR4 -= 1;
+//		  }
+////		  driver_tx_data[0] = rotate_speed_can;
+////		  driver_tx_data[1] = rotate_speed_side;
+////		  HAL_CAN_AddTxMessage(&hcan, &pHeader, driver_tx_data, &TxMailbox);
+//	  	  HAL_Delay(3);
+//	  }
+//  }
   }
-  }
-
   void reduce_speed_right() {
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
-	  	input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
-	  	rotate_time = (float)(input_capture*ratio)/1000000;
-		if (rotate_time != 0) {
-			rotate_speed = (1/rotate_time);
-		}
-		else {
-			rotate_speed = 0;
-		}
-	  	rotate_speed_can = (uint8_t)(rotate_speed*60);
-	  	if (rotate_time == 0) {
-	  		rotate_speed = 0;
-	  	}
-	  		if (TIM2->CCR4 > 0) {
-	  			TIM2->CCR4 -= 1;
-			}
-	  		driver_tx_data[0] = rotate_speed_can;
-	  		driver_tx_data[1] = rotate_speed_side;
-			driver_tx_data[2] = state;
-	  		HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  		HAL_Delay(2);
+	  	  if (TIM2->CCR4 > 0) {
+	  		  TIM2->CCR4 -= 1;
+		  }
+//	  	  driver_tx_data[0] = rotate_speed_can;
+//	  	  driver_tx_data[1] = rotate_speed_side;
+//	  	  HAL_CAN_AddTxMessage(&hcan, &pHeader, driver_tx_data, &TxMailbox);
+	  	  HAL_Delay(2);
   }
 
   void reduce_speed_left() {
   	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_SET);
   	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-  	  	input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
-  	  	rotate_time = (float)(input_capture*ratio)/1000000;
-		if (rotate_time != 0) {
-			rotate_speed = (1/rotate_time);
-		}
-		else {
-			rotate_speed = 0;
-		}
-  	  	rotate_speed_can = (uint8_t)(rotate_speed*60);
-  	  	if (rotate_time == 0) {
-  	  		rotate_speed = 0;
-  	  	}
-  			if (TIM2->CCR4 > 0) {
-  				TIM2->CCR4 -= 1;
-  			}
-  			driver_tx_data[0] = rotate_speed_can;
-  	  		driver_tx_data[1] = rotate_speed_side;
-  	  		driver_tx_data[2] = state;
-  	  		HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-  	  		HAL_Delay(2);
+  	  	  if (TIM2->CCR4 > 0) {
+  	  		  TIM2->CCR4 -= 1;
+  		  }
+//  		  driver_tx_data[0] = rotate_speed_can;
+//  	  	  driver_tx_data[1] = rotate_speed_side;
+//  	  	  HAL_CAN_AddTxMessage(&hcan, &pHeader, driver_tx_data, &TxMailbox);
+  	  	  HAL_Delay(2);
   }
-
-//  void reduce_speed_right() {
-//	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
-//	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
-//	  target_speed_r = 0.1;
-//	  rotate_speed_side = 1;
-//	  if (target_speed_r >= 0) {
-//	  	input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
-//	  	rotate_time = (float)(input_capture*ratio)/1000000;
-//	  	rotate_speed = (1/rotate_time);
-//	  	rotate_speed_can = (uint8_t)(rotate_speed*60);
-//	  	if (rotate_time == 0) {
-//	  		rotate_speed = 0;
-//	  	}
-//	  	if ((rotate_speed<(target_speed_r*0.999f))&&(rotate_speed!=0)) {
-//	  		  if (TIM2->CCR4 > 750) {
-//	  			  TIM2->CCR4 = 750;
-//	  	  	  }
-//	  	  	  TIM2->CCR4 += 1;
-//	  	  	  driver_tx_data[0] = rotate_speed_can;
-//	  	  	  driver_tx_data[1] = rotate_speed_side;
-//			  driver_tx_data[2] = state;
-//	  	  	  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-//	  	  	  HAL_Delay(3);
-//	  	}
-//	  	else if ((rotate_speed>(target_speed_r*1.001f))) {
-//	  		if (TIM2->CCR4 > 0) {
-//	  			TIM2->CCR4 -= 1;
-//			}
-//	  		driver_tx_data[0] = rotate_speed_can;
-//	  		driver_tx_data[1] = rotate_speed_side;
-//			driver_tx_data[2] = state;
-//	  		HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-//	  		HAL_Delay(3);
-//	  	}
-//	  }
-//  }
-//
-//  void reduce_speed_left() {
-//  	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_SET);
-//  	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-//  	  target_speed_l = 0.1;
-//  	  rotate_speed_side = 2;
-//  	  if (target_speed_l >= 0) {
-//  	  	input_capture = HAL_TIM_ReadCapturedValue(&htim3, TIM_CHANNEL_4);
-//  	  	rotate_time = (float)(input_capture*ratio)/1000000;
-//  	  	rotate_speed = (1/rotate_time);
-//  	  	rotate_speed_can = (uint8_t)(rotate_speed*60);
-//  	  	if (rotate_time == 0) {
-//  	  		rotate_speed = 0;
-//  	  	}
-//  	  	if ((rotate_speed<(target_speed_l*0.999f))&&(rotate_speed!=0)) {
-//  	  		if (TIM2->CCR4 > 750) {
-//  	  			TIM2->CCR4 = 750;
-//  	  	  	}
-//  	  	  	TIM2->CCR4 += 1;
-//  	  	  	driver_tx_data[0] = rotate_speed_can;
-//  	  	  	driver_tx_data[1] = rotate_speed_side;
-//  	  	  	driver_tx_data[2] = state;
-//  	  	  	HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-//  	  	  	HAL_Delay(3);
-//  	  	}
-//  	  	else if ((rotate_speed>(target_speed_l*1.001f))) {
-//  			if (TIM2->CCR4 > 0) {
-//  				TIM2->CCR4 -= 1;
-//  			}
-//  			driver_tx_data[0] = rotate_speed_can;
-//  	  		driver_tx_data[1] = rotate_speed_side;
-//  	  		driver_tx_data[2] = state;
-//  	  		HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-//  	  		HAL_Delay(3);
-//  	  	}
-//  	  }
-//  }
-
 
   void stop_movement(void)
   {
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-	  TIM2->CCR4 = 150;
-	  rotate_speed_can = 0;
-	  rotate_speed_side = 0;
-	  rotate_time = 0;
-	  rotate_speed = 0;
+	  TIM2->CCR4 = 0;
   }
 
-//  void stop_movement();
-//  {
-//
-//  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -397,63 +268,43 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	if (TIM2->CCR4 < 1000) {
-	  if ((t_speed > 0)&&(flag == State_Right)) {
-		  move_right(t_speed);
-		  state = 1;
-		  flag = State_Right;
-	  }
-	  else if ((t_speed < 0)&&(flag == State_Right)) {
-		  //move_left(-t_speed);
-//		  while (rotate_speed >= 0.1) {
-//		  if (rotate_speed >= 0.1) {
+//	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
+//	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
+//	  TIM2->CCR4 = 4999;
+	  move_left(t_speed);
+//	  if ((t_speed > 0)&&(flag == State_Right)) {
+//		  move_right(t_speed);
+//		  flag = State_Right;
+//	  }
+//	  else if ((t_speed < 0)&&(flag == State_Right)) {
+//		  while (TIM2->CCR4 > 0) {
 //			  reduce_speed_right();
 //		  }
-		  while (TIM2->CCR4 > 0) {
-			  reduce_speed_right();
-		  }
-		  stop_movement();
-		  state = 2;
-		  flag = State_Left;
-		  //move_left(-t_speed);
-	  }
-	  else if ((t_speed < 0)&&(flag == State_Left)) {
-		  move_left(-t_speed);
-		  state = 3;
-		  flag = State_Left;
-	  }
-	  else if ((t_speed > 0)&&(flag == State_Left)) {
-		  while (TIM2->CCR4 > 0) {
-			  reduce_speed_left();
-		  }
-//		  if (rotate_speed >= 0.1) {
+//		  stop_movement();
+//		  flag = State_Left;
+//	  }
+//	  else if ((t_speed < 0)&&(flag == State_Left)) {
+//		  move_left(-t_speed);
+//		  flag = State_Left;
+//	  }
+//	  else if ((t_speed > 0)&&(flag == State_Left)) {
+//		  while (TIM2->CCR4 > 0) {
 //			  reduce_speed_left();
 //		  }
-		  stop_movement();
-		  state = 4;
-		  flag = State_Right;
-	  }
-	  else if (t_speed == 0) {
-		  state = 5;
-		  stop_movement();
-	  }
-	  else {
-	  	 stop_movement();
-	  	state = 6;
-	  }
-	  if ((HAL_GetTick() % 20) == 0) {
-
-		  driver_tx_data[0] = rotate_speed_can;
-		  driver_tx_data[1] = rotate_speed_side;
-		  driver_tx_data[2] = state;
-		  HAL_CAN_AddTxMessage(&hcan1, &pHeader, driver_tx_data, &TxMailbox);
-	  }
-	  pred_t_speed = t_speed;
-	}
-	else {
-		state = 7;
-		TIM2->CCR4 = 0;
-	}
+//		  stop_movement();
+//		  flag = State_Right;
+//	  }
+//	  else if (t_speed == 0) {
+//		  stop_movement();
+//	  }
+	  //move_right(t_speed);
+//	  if ((HAL_GetTick() % 20) == 0) {
+//
+//		  driver_tx_data[0] = rotate_speed_can;
+//		  driver_tx_data[1] = rotate_speed_side;
+//		  driver_tx_data[2] = state;
+//		  HAL_CAN_AddTxMessage(&hcan, &pHeader, driver_tx_data, &TxMailbox);
+//	  }
   }
   /* USER CODE END 3 */
 }
@@ -467,7 +318,8 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Initializes the CPU, AHB and APB busses clocks
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
@@ -480,7 +332,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks
+  /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -510,19 +362,19 @@ static void MX_CAN_Init(void)
   /* USER CODE BEGIN CAN_Init 1 */
 
   /* USER CODE END CAN_Init 1 */
-  hcan1.Instance = CAN1;
-  hcan1.Init.Prescaler = 4;
-  hcan1.Init.Mode = CAN_MODE_NORMAL;
-  hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan1.Init.TimeSeg1 = CAN_BS1_7TQ;
-  hcan1.Init.TimeSeg2 = CAN_BS2_1TQ;
-  hcan1.Init.TimeTriggeredMode = DISABLE;
-  hcan1.Init.AutoBusOff = DISABLE;
-  hcan1.Init.AutoWakeUp = DISABLE;
-  hcan1.Init.AutoRetransmission = DISABLE;
-  hcan1.Init.ReceiveFifoLocked = DISABLE;
-  hcan1.Init.TransmitFifoPriority = DISABLE;
-  if (HAL_CAN_Init(&hcan1) != HAL_OK)
+  hcan.Instance = CAN1;
+  hcan.Init.Prescaler = 4;
+  hcan.Init.Mode = CAN_MODE_NORMAL;
+  hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_7TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan.Init.TimeTriggeredMode = DISABLE;
+  hcan.Init.AutoBusOff = DISABLE;
+  hcan.Init.AutoWakeUp = DISABLE;
+  hcan.Init.AutoRetransmission = DISABLE;
+  hcan.Init.ReceiveFifoLocked = DISABLE;
+  hcan.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan) != HAL_OK)
   {
     Error_Handler();
   }
@@ -592,54 +444,6 @@ static void MX_TIM2_Init(void)
 }
 
 /**
-  * @brief TIM3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM3_Init(void)
-{
-
-  /* USER CODE BEGIN TIM3_Init 0 */
-
-  /* USER CODE END TIM3_Init 0 */
-
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_IC_InitTypeDef sConfigIC = {0};
-
-  /* USER CODE BEGIN TIM3_Init 1 */
-
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 72;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_IC_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
-  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
-  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
-  sConfigIC.ICFilter = 15;
-  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_4) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM3_Init 2 */
-
-  /* USER CODE END TIM3_Init 2 */
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -667,6 +471,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PB1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
   /*Configure GPIO pins : PB10 PB11 PB12 PB13
                            PB14 PB8 PB9 */
   GPIO_InitStruct.Pin = GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13
@@ -675,6 +485,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
 }
 

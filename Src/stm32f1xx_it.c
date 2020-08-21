@@ -42,7 +42,14 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-
+double _dt = 1;
+double _max = 999;
+double _min = -999;
+double _Kp = 0.7;
+double _Kd = 0.7;
+double _Ki;
+double _pre_error = 0;
+double _integral;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -52,17 +59,47 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+double calculate( double target_speed, double current_speed )
+{
+
+    // Calculate error
+    double error = target_speed - current_speed;
+
+    // Proportional term
+    double Pout = _Kp * error;
+
+    // Integral term
+//    _integral += error * _dt;
+//    double Iout = _Ki * _integral;
+
+    // Derivative term
+    double derivative = (error - _pre_error) / _dt;
+    double Dout = _Kd * derivative;
+
+    // Calculate total output
+    double output = Pout + Dout;
+
+    // Restrict to max/min
+    if( output > _max )
+        output = _max;
+    else if( output < _min )
+        output = _min;
+
+    // Save error to previous error
+    _pre_error = error;
+
+    return output;
+}
 
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern CAN_HandleTypeDef hcan1;
-extern TIM_HandleTypeDef htim3;
+extern CAN_HandleTypeDef hcan;
 /* USER CODE BEGIN EV */
 extern CAN_TxHeaderTypeDef pHeader;
 extern CAN_RxHeaderTypeDef pRxHeader;
 extern uint32_t TxMailbox;
-extern uint8_t driver_tx_data[3];
+extern uint8_t driver_tx_data[4];
 extern uint8_t rotate_speed_can;
 extern uint8_t rotate_speed_side;
 extern uint8_t state_can;
@@ -71,9 +108,16 @@ extern uint8_t f;
 extern uint8_t control_data[8];
 extern uint8_t speed;
 extern uint8_t side;
-extern float t_speed;
+extern uint8_t t_speed;
 extern float target_speed;
 extern _Bool side_change;
+extern volatile uint8_t tick;
+extern volatile uint16_t hall_tick;
+extern volatile uint8_t hall_speed;
+extern double u_pwm;
+extern uint16_t pwm;
+extern double inc;
+//extern uint16_t output;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -207,6 +251,38 @@ void SysTick_Handler(void)
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
+  if (HAL_GetTick() % 100 == 0) {
+	  tick++;
+	  hall_speed = (uint8_t)(hall_tick*1.08);
+//	  for (int i = 0; i < 11; ++i) {
+//		  __NOP();
+//	  }
+	  driver_tx_data[0] = hall_speed;
+	  //driver_tx_data[1] = (uint8_t)(hall_speed>>8);
+	  driver_tx_data[1] = tick;
+	  driver_tx_data[2] = (uint8_t)(hall_tick);
+	  driver_tx_data[3] = (uint8_t)(hall_tick>>8);
+	  inc = calculate((double)t_speed, (double)hall_speed);
+	  u_pwm += inc;
+	  if( u_pwm > _max )
+		  u_pwm = _max;
+	  else if( u_pwm < _min )
+		  u_pwm = _min;
+	  pwm = u_pwm;
+//	  if (hall_speed < t_speed) {
+//		  output += (t_speed-hall_speed)*_Kp;
+//	  }
+//	  else if (hall_speed > t_speed) {
+//		  output -= (hall_speed-t_speed)*_Kp;
+//	  }
+//	  if( output > _max )
+//		  output = _max;
+//	  else if( output < _min )
+//	      output = _min;
+//	  pwm = output;
+	  HAL_CAN_AddTxMessage(&hcan, &pHeader, driver_tx_data, &TxMailbox);
+	  hall_tick = 0;
+  }
 
   /* USER CODE END SysTick_IRQn 1 */
 }
@@ -219,6 +295,20 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles EXTI line1 interrupt.
+  */
+void EXTI1_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI1_IRQn 0 */
+
+  /* USER CODE END EXTI1_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_1);
+  /* USER CODE BEGIN EXTI1_IRQn 1 */
+  hall_tick++;
+  /* USER CODE END EXTI1_IRQn 1 */
+}
+
+/**
   * @brief This function handles USB low priority or CAN RX0 interrupts.
   */
 void USB_LP_CAN1_RX0_IRQHandler(void)
@@ -226,33 +316,19 @@ void USB_LP_CAN1_RX0_IRQHandler(void)
   /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 0 */
 
   /* USER CODE END USB_LP_CAN1_RX0_IRQn 0 */
-  HAL_CAN_IRQHandler(&hcan1);
+  HAL_CAN_IRQHandler(&hcan);
   /* USER CODE BEGIN USB_LP_CAN1_RX0_IRQn 1 */
-  HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &pRxHeader, control_data);
+  HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &pRxHeader, control_data);
 
   side = control_data[0];
   //t_speed = control_data[1]/60.0f;
   if (side == 0) {
-	  t_speed = -(control_data[1]/60.0f);
+	  t_speed = control_data[1];
   }
   else if (side == 1) {
-	  t_speed = control_data[1]/60.0f;
+	  t_speed = control_data[1];
   }
   /* USER CODE END USB_LP_CAN1_RX0_IRQn 1 */
-}
-
-/**
-  * @brief This function handles TIM3 global interrupt.
-  */
-void TIM3_IRQHandler(void)
-{
-  /* USER CODE BEGIN TIM3_IRQn 0 */
-
-  /* USER CODE END TIM3_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim3);
-  /* USER CODE BEGIN TIM3_IRQn 1 */
-
-  /* USER CODE END TIM3_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
