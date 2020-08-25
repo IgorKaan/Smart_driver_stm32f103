@@ -66,16 +66,6 @@ uint32_t header_id = 0x3A;
 uint32_t filter_id = 0x3F;
 uint32_t input_capture = 0;
 
-double inc = 0;
-double u_pwm = 0;
-
-double _dt = 1;
-double _max = 999;
-double _min = -999;
-double _Kp = 2.0;
-double _Kd = 2.0;
-double _pre_error = 0;
-
 uint16_t dc_driver_pwm = 0;
 
 enum States
@@ -101,26 +91,7 @@ static void MX_CAN_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-double calculate( double target_speed, double current_speed )
-{
-    double error = target_speed - current_speed;
 
-    double Pout = _Kp * error;
-
-    double derivative = (error - _pre_error) / _dt;
-    double Dout = _Kd * derivative;
-
-    double output = Pout + Dout;
-
-    if( output > _max )
-        output = _max;
-    else if( output < _min )
-        output = _min;
-
-    _pre_error = error;
-
-    return output;
-}
 /* USER CODE END 0 */
 
 /**
@@ -178,59 +149,60 @@ int main(void)
   void rotate_ccw(uint8_t r_speed) {
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
-	  if (HAL_GetTick() % 100 == 0) {
-		  inc = calculate((double)(r_speed), (double)encoder_speed);
-		  u_pwm += inc;
-		  if( u_pwm > _max )
-			  u_pwm = _max;
-		  else if( u_pwm < _min )
-			  u_pwm = _min;
-		  dc_driver_pwm = u_pwm;
-	  }
+//	  if (HAL_GetTick() % 100 == 0) {
+//		  inc = calculate((double)(r_speed), (double)encoder_speed);
+//		  u_pwm += inc;
+//		  if( u_pwm > _max )
+//			  u_pwm = _max;
+//		  else if( u_pwm < _min )
+//			  u_pwm = _min;
+//		  dc_driver_pwm = u_pwm;
+//	  }
 	  TIM2->CCR4 = (uint16_t)dc_driver_pwm;
   }
 
   void rotate_cw(uint8_t l_speed) {
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_SET);
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-	  if (HAL_GetTick() % 100 == 0) {
-		  inc = calculate((double)(l_speed), (double)encoder_speed);
-		  u_pwm += inc;
-		  if( u_pwm > _max )
-			  u_pwm = _max;
-		  else if( u_pwm < _min )
-			  u_pwm = _min;
-		  dc_driver_pwm = u_pwm;
-	  }
+//	  if (HAL_GetTick() % 100 == 0) {
+//		  inc = calculate((double)(l_speed), (double)encoder_speed);
+//		  u_pwm += inc;
+//		  if( u_pwm > _max )
+//			  u_pwm = _max;
+//		  else if( u_pwm < _min )
+//			  u_pwm = _min;
+//		  dc_driver_pwm = u_pwm;
+//	  }
 	  TIM2->CCR4 = (uint16_t)dc_driver_pwm;
+	  //TIM2->CCR4 = 1500;
   }
   void reduce_speed_ccw() {
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
 	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
-	  if (HAL_GetTick() % 100 == 0) {
-		  inc = calculate(0, (double)encoder_speed);
-		  u_pwm += inc;
-		  if( u_pwm > _max )
-			  u_pwm = _max;
-		  else if( u_pwm < _min )
-			  u_pwm = _min;
-		  dc_driver_pwm = u_pwm;
-	  }
+//	  if (HAL_GetTick() % 100 == 0) {
+//		  inc = calculate(0, (double)encoder_speed);
+//		  u_pwm += inc;
+//		  if( u_pwm > _max )
+//			  u_pwm = _max;
+//		  else if( u_pwm < _min )
+//			  u_pwm = _min;
+//		  dc_driver_pwm = u_pwm;
+//	  }
 	  TIM2->CCR4 = (uint16_t)dc_driver_pwm;
   }
 
   void reduce_speed_cw() {
   	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_SET);
   	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_RESET);
-	  if (HAL_GetTick() % 100 == 0) {
-		  inc = calculate(0, (double)encoder_speed);
-		  u_pwm += inc;
-		  if( u_pwm > _max )
-			  u_pwm = _max;
-		  else if( u_pwm < _min )
-			  u_pwm = _min;
-		  dc_driver_pwm = u_pwm;
-	  }
+//	  if (HAL_GetTick() % 100 == 0) {
+//		  inc = calculate(0, (double)encoder_speed);
+//		  u_pwm += inc;
+//		  if( u_pwm > _max )
+//			  u_pwm = _max;
+//		  else if( u_pwm < _min )
+//			  u_pwm = _min;
+//		  dc_driver_pwm = u_pwm;
+//	  }
 	  TIM2->CCR4 = (uint16_t)dc_driver_pwm;
   }
 
@@ -253,32 +225,33 @@ int main(void)
 //	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_8,GPIO_PIN_RESET);
 //	  HAL_GPIO_WritePin(GPIOB,GPIO_PIN_9,GPIO_PIN_SET);
 //	  TIM2->CCR4 = 4999;
+	  rotate_cw(60);
 //	  move_left(can_rx_speed);
-	  if ((can_rx_speed > 0)&&(flag == State_CCW)) {
-		  rotate_ccw(can_rx_speed);
-		  flag = State_CCW;
-	  }
-	  else if ((can_rx_speed < 0)&&(flag == State_CCW)) {
-		  while (TIM2->CCR4 > 0) {
-			  reduce_speed_ccw();
-		  }
-		  stop_movement();
-		  flag = State_CW;
-	  }
-	  else if ((can_rx_speed < 0)&&(flag == State_CW)) {
-		  rotate_cw(-can_rx_speed);
-		  flag = State_CW;
-	  }
-	  else if ((can_rx_speed > 0)&&(flag == State_CW)) {
-		  while (TIM2->CCR4 > 0) {
-			  reduce_speed_cw();
-		  }
-		  stop_movement();
-		  flag = State_CCW;
-	  }
-	  else if (can_rx_speed == 0) {
-		  stop_movement();
-	  }
+//	  if ((can_rx_speed > 0)&&(flag == State_CCW)) {
+//		  rotate_ccw(can_rx_speed);
+//		  flag = State_CCW;
+//	  }
+//	  else if ((can_rx_speed < 0)&&(flag == State_CCW)) {
+//		  while (TIM2->CCR4 > 0) {
+//			  reduce_speed_ccw();
+//		  }
+//		  stop_movement();
+//		  flag = State_CW;
+//	  }
+//	  else if ((can_rx_speed < 0)&&(flag == State_CW)) {
+//		  rotate_cw(-can_rx_speed);
+//		  flag = State_CW;
+//	  }
+//	  else if ((can_rx_speed > 0)&&(flag == State_CW)) {
+//		  while (TIM2->CCR4 > 0) {
+//			  reduce_speed_cw();
+//		  }
+//		  stop_movement();
+//		  flag = State_CCW;
+//	  }
+//	  else if (can_rx_speed == 0) {
+//		  stop_movement();
+//	  }
   }
   /* USER CODE END 3 */
 }
@@ -380,7 +353,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 1;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 7199;
+  htim2.Init.Period = 3599;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)

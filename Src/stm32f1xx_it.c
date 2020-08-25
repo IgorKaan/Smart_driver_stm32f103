@@ -42,7 +42,17 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
+double inc = 0;
+double u_pwm = 0;
 
+double _dt = 1;
+double _Max = 3600;
+double _Min = 0;
+double _max = 999;
+double _min = -999;
+double _Kp = 4.0;
+double _Kd = 4.0;
+double _pre_error = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -52,7 +62,26 @@ double calculate( double target_speed, double current_speed );
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+double calculate( double target_speed, double current_speed )
+{
+    double error = target_speed - current_speed;
 
+    double Pout = _Kp * error;
+
+    double derivative = (error - _pre_error) / _dt;
+    double Dout = _Kd * derivative;
+
+    double output = Pout + Dout;
+
+    if( output > _max )
+        output = _max;
+    else if( output < _min )
+        output = _min;
+
+    _pre_error = error;
+
+    return output;
+}
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -73,11 +102,6 @@ extern uint8_t can_rx_speed;
 
 extern volatile uint16_t encoder_tick;
 extern volatile uint8_t encoder_speed;
-
-extern double u_pwm;
-extern double inc;
-
-
 
 //extern uint16_t output;
 /* USER CODE END EV */
@@ -208,7 +232,14 @@ void SysTick_Handler(void)
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
   if (HAL_GetTick() % 100 == 0) {
-	  encoder_speed = (uint8_t)(encoder_tick*(600/encoder_ratio));
+	  encoder_speed = (uint8_t)(encoder_tick*((double)600/encoder_ratio));
+	  		  inc = calculate(can_rx_speed, encoder_speed);
+	  		  u_pwm += inc;
+	  		  if( u_pwm > _Max )
+	  			  u_pwm = _Max;
+	  		  else if( u_pwm < _Min )
+	  			  u_pwm = _Min;
+	  		  dc_driver_pwm = (uint16_t)u_pwm;
 	  driver_tx_data[0] = encoder_speed;
 	  driver_tx_data[1] = (uint8_t)(encoder_tick);
 	  driver_tx_data[2] = (uint8_t)(encoder_tick>>8);
